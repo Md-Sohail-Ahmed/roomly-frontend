@@ -2,16 +2,21 @@ import { apiRequest } from "../api/apiClient.js";
 import { cancelMockBooking, createMockBooking, getMockMyBookings } from "./mockMyBookingsService.js";
 import { fetchAllPages, mapBooking } from "./apiModels.js";
 import { roomsService } from "./roomsService.js";
+import { getSavedUser } from "./sessionStore.js";
 
 const useMockServices = import.meta.env.DEV && import.meta.env.VITE_USE_MOCK_SERVICES === "true";
 
 async function getMyBookingsFromApi() {
+    const currentUser = getSavedUser();
+    const isAdmin = currentUser?.role === "admin";
     const [bookings, rooms] = await Promise.all([
-        fetchAllPages((page, limit) => apiRequest(`/bookings/mine?page=${page}&limit=${limit}`)),
+        fetchAllPages((page, limit) => apiRequest(`${isAdmin ? "/bookings" : "/bookings/mine"}?page=${page}&limit=${limit}`)),
         roomsService.getRooms(),
     ]);
     const roomById = new Map(rooms.map((room) => [String(room.id), room]));
-    return bookings.map((booking) => mapBooking(booking, roomById));
+    return bookings
+        .filter((booking) => !isAdmin || String(booking.user_id) === String(currentUser.id))
+        .map((booking) => mapBooking(booking, roomById));
 }
 
 async function cancelMyBookingFromApi(bookingId) {
