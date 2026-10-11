@@ -1,5 +1,6 @@
 import { getApiErrorMessage } from "../utils/apiErrors.js";
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.trim();
+import { getSavedToken } from "../services/sessionStore.js";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.trim() || "/api/v1";
 export class ApiError extends Error {
     status;
     requestId;
@@ -18,7 +19,8 @@ function getRequestUrl(path) {
     }
     const baseUrl = API_BASE_URL.endsWith("/") ? API_BASE_URL : `${API_BASE_URL}/`;
     const relativePath = path.replace(/^\/+/, "");
-    return new URL(relativePath, baseUrl);
+    if (/^https?:\/\//i.test(baseUrl)) return new URL(relativePath, baseUrl);
+    return new URL(`${baseUrl}${relativePath}`, window.location.origin);
 }
 async function readResponseBody(response) {
     const responseText = await response.text();
@@ -45,6 +47,8 @@ export async function apiRequest(path, options = {}) {
         throw new ApiError("VITE_API_BASE_URL is not configured.");
     }
     const headers = new Headers(options.headers);
+    const token = getSavedToken();
+    if (token && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
     const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
     if (options.body && !isFormData && !headers.has("Content-Type")) {
         headers.set("Content-Type", "application/json");

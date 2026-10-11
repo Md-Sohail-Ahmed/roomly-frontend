@@ -10,19 +10,13 @@ Roomly is a meeting-room booking frontend built with React and JSX. The interfac
    npm ci
    ```
 
-2. Copy the environment template:
-
-   ```sh
-   cp .env.example .env
-   ```
-
-3. Start Vite:
+2. Start Vite:
 
    ```sh
    npm run dev
    ```
 
-For local mock accounts, expand **Development demo accounts** on the login page. Mock accounts, room and amenity edits, and bookings are temporary in-memory data; reloading the app resets those changes.
+The default configuration connects to the Go backend at `http://localhost:8080` through the Vite `/api` proxy. Start the backend first. No `.env` file is required for local integration. To switch to mock accounts and in-memory demo data, set `VITE_USE_MOCK_SERVICES=true` in `.env`.
 
 ## Check the project
 
@@ -50,8 +44,4 @@ The tests cover booking rules and history, availability conflicts, mock account 
 
 Vite development uses mock services by default. Set `VITE_USE_MOCK_SERVICES=false` in the local `.env` file to select the API services during development. Production builds use the API services; they do not use mock data.
 
-The Go backend contract has not yet been agreed. Until it is, API routes and payloads remain proposals, and the blank route settings in `.env.example` should stay blank. Agree on authentication, endpoint paths, response shapes, error status codes, pagination, request IDs, and UTC timestamp formats with the backend developer before configuring those values. The frontend API client uses `VITE_API_BASE_URL`, includes credentials for session cookies, and surfaces `X-Request-ID` in API errors when provided.
-
-Booking validation in the browser helps people correct mistakes, while the backend must make the final decisions about booking duration, capacity, availability, conflicts, and authorization. Real API integration has not been verified because the backend contract and endpoints are not available yet.
-
-Before final submission, replace the development mock services with verified API implementations and remove the temporary mock records and mock accounts.
+The actual API routes, field mappings, authentication behavior, and unsupported backend features are documented in [docs/API-CONTRACT.md](docs/API-CONTRACT.md). JWTs are stored for the current browser tab and sent as bearer tokens. The backend makes the final decisions about permissions, booking duration, room capacity, availability, and conflicts.

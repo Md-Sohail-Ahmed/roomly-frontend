@@ -1,36 +1,23 @@
 import { apiRequest } from "../api/apiClient.js";
 import { loginWithMock, logoutMock, registerWithMock, } from "./mockAuthService.js";
-import { clearSavedUser, getSavedUser, saveUser } from "./sessionStore.js";
+import { clearSavedUser, getSavedUser, getSavedToken, saveSession, saveUser } from "./sessionStore.js";
 export { clearSavedUser };
-const useMockServices = import.meta.env.DEV && import.meta.env.VITE_USE_MOCK_SERVICES !== "false";
-const apiSettings = {
-    loginPath: import.meta.env.VITE_LOGIN_PATH?.trim(),
-    registerPath: import.meta.env.VITE_REGISTER_PATH?.trim(),
-    logoutPath: import.meta.env.VITE_LOGOUT_PATH?.trim(),
-    currentUserPath: import.meta.env.VITE_CURRENT_USER_PATH?.trim(),
-};
-function requireApiPath(name, value) {
-    if (!value) {
-        throw new Error(`${name} must be set after the authentication API contract is agreed.`);
-    }
-    return value;
-}
+const useMockServices = import.meta.env.DEV && import.meta.env.VITE_USE_MOCK_SERVICES === "true";
 function validateUserResponse(response) {
-    if (!response || typeof response !== "object" || !("user" in response)) {
-        throw new Error("The authentication API must return a user object.");
+    if (!response || typeof response !== "object" || !("user" in response) || typeof response.token !== "string") {
+        throw new Error("The login API must return a token and user object.");
     }
     const user = response.user;
     if (!user ||
-        typeof user.id !== "string" ||
+        (typeof user.id !== "string" && typeof user.id !== "number") ||
         typeof user.email !== "string" ||
         (user.role !== "employee" && user.role !== "admin")) {
         throw new Error("The authentication API must return a user with id, email, and role.");
     }
-    return user;
+    return { user, token: response.token };
 }
 async function loginWithApi(email, password) {
-    const path = requireApiPath("VITE_LOGIN_PATH", apiSettings.loginPath);
-    const response = await apiRequest(path, {
+    const response = await apiRequest("/auth/login", {
         method: "POST",
         body: JSON.stringify({ email, password }),
         credentials: "include",
@@ -38,37 +25,27 @@ async function loginWithApi(email, password) {
     return validateUserResponse(response);
 }
 async function registerWithApi(name, email, password) {
-    const path = requireApiPath("VITE_REGISTER_PATH", apiSettings.registerPath);
-    const response = await apiRequest(path, {
+    return apiRequest("/auth/register", {
         method: "POST",
         body: JSON.stringify({ name, email, password }),
         credentials: "include",
     });
-    return validateUserResponse(response);
-}
-async function logoutWithApi() {
-    const path = requireApiPath("VITE_LOGOUT_PATH", apiSettings.logoutPath);
-    return apiRequest(path, { method: "POST", credentials: "include" });
 }
 async function restoreCurrentUserFromApi() {
-    const path = requireApiPath("VITE_CURRENT_USER_PATH", apiSettings.currentUserPath);
-    const response = await apiRequest(path, { credentials: "include" });
-    return validateUserResponse(response);
+    return getSavedToken() ? getSavedUser() : null;
 }
 export function getCurrentUser() {
     return getSavedUser();
 }
 export async function login(email, password) {
-    const user = useMockServices
-        ? await loginWithMock(email.trim(), password)
-        : await loginWithApi(email.trim(), password);
-    return saveUser(user);
+    if (useMockServices) return saveUser(await loginWithMock(email.trim(), password));
+    const { user, token } = await loginWithApi(email.trim(), password);
+    return saveSession(user, token);
 }
 export async function registerEmployee(name, email, password) {
-    const user = useMockServices
-        ? await registerWithMock(name.trim(), email.trim(), password)
-        : await registerWithApi(name.trim(), email.trim(), password);
-    return saveUser(user);
+    if (useMockServices) return saveUser(await registerWithMock(name.trim(), email.trim(), password));
+    await registerWithApi(name.trim(), email.trim(), password);
+    return login(email.trim(), password);
 }
 export async function logout() {
     try {
@@ -76,7 +53,7 @@ export async function logout() {
             await logoutMock();
         }
         else {
-            await logoutWithApi();
+            // JWT sessions are stateless; clearing the local token logs out.
         }
     }
     finally {
@@ -89,7 +66,7 @@ export async function restoreSession() {
     }
     try {
         const user = await restoreCurrentUserFromApi();
-        return saveUser(user);
+        return user ? saveUser(user) : null;
     }
     catch (error) {
         clearSavedUser();

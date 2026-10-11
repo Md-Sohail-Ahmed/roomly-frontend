@@ -62,7 +62,7 @@ function Login({ currentUser, onLogin }) {
           New to Roomly? <Link to="/register" className="font-semibold text-violet-700 underline">Create an employee account</Link>
         </p>
 
-        {import.meta.env.DEV && import.meta.env.VITE_USE_MOCK_SERVICES !== "false" && (<details className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+        {import.meta.env.DEV && import.meta.env.VITE_USE_MOCK_SERVICES === "true" && (<details className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
             <summary className="cursor-pointer font-semibold">Development demo accounts</summary>
             <p className="mt-2">Employee: employee@roomly.local / Roomly123!</p>
             <p>Admin: admin@roomly.local / Admin123!</p>

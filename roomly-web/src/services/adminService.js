@@ -1,77 +1,67 @@
 import { apiRequest } from "../api/apiClient.js";
-import { getMockAdminAmenities, getMockAdminRooms, getMockUtilizationReport, saveMockAmenity, saveMockRoom, } from "./mockAdminService.js";
-const useMockServices = import.meta.env.DEV && import.meta.env.VITE_USE_MOCK_SERVICES !== "false";
-const apiSettings = {
-    roomsPath: import.meta.env.VITE_ADMIN_ROOMS_PATH?.trim(),
-    roomPathTemplate: import.meta.env.VITE_ADMIN_ROOM_PATH_TEMPLATE?.trim(),
-    amenitiesPath: import.meta.env.VITE_ADMIN_AMENITIES_PATH?.trim(),
-    amenityPathTemplate: import.meta.env.VITE_ADMIN_AMENITY_PATH_TEMPLATE?.trim(),
-    utilizationPath: import.meta.env.VITE_ADMIN_UTILIZATION_PATH?.trim(),
-};
-function requireSetting(name, value) {
-    if (!value) {
-        throw new Error(`${name} must be set after the admin API contract is agreed.`);
-    }
-    return value;
-}
-function requireList(value, label) {
-    if (!Array.isArray(value)) {
-        throw new Error(`The ${label} API response must be a list.`);
-    }
-    return value;
-}
+import { getMockAdminAmenities, getMockAdminRooms, getMockUtilizationReport, saveMockAmenity, saveMockRoom } from "./mockAdminService.js";
+import { calculateUtilizationRows } from "../utils/utilization.js";
+import { fetchAllPages, mapBooking, mapRoom } from "./apiModels.js";
+
+const useMockServices = import.meta.env.DEV && import.meta.env.VITE_USE_MOCK_SERVICES === "true";
+
 async function getRoomsFromApi() {
-    const path = requireSetting("VITE_ADMIN_ROOMS_PATH", apiSettings.roomsPath);
-    return requireList(await apiRequest(path), "admin rooms");
+    const rooms = await fetchAllPages((page, limit) => apiRequest(`/rooms?page=${page}&limit=${limit}`));
+    return rooms.map(mapRoom);
 }
-async function saveRoomWithApi(roomDetails) {
-    const roomsPath = requireSetting("VITE_ADMIN_ROOMS_PATH", apiSettings.roomsPath);
-    if (!roomDetails.id) {
-        return apiRequest(roomsPath, {
-            method: "POST",
-            body: JSON.stringify(roomDetails),
-        });
-    }
-    const template = requireSetting("VITE_ADMIN_ROOM_PATH_TEMPLATE", apiSettings.roomPathTemplate);
-    if (!template.includes("{roomId}")) {
-        throw new Error("The admin room path must include {roomId}.");
-    }
-    const path = template.replace("{roomId}", encodeURIComponent(roomDetails.id));
-    return apiRequest(path, {
-        method: "PATCH",
-        body: JSON.stringify(roomDetails),
-    });
-}
+
 async function getAmenitiesFromApi() {
-    const path = requireSetting("VITE_ADMIN_AMENITIES_PATH", apiSettings.amenitiesPath);
-    return requireList(await apiRequest(path), "amenities");
+    return fetchAllPages((page, limit) => apiRequest(`/amenities?page=${page}&limit=${limit}`));
 }
-async function saveAmenityWithApi(amenityDetails) {
-    const amenitiesPath = requireSetting("VITE_ADMIN_AMENITIES_PATH", apiSettings.amenitiesPath);
-    if (!amenityDetails.id) {
-        return apiRequest(amenitiesPath, {
-            method: "POST",
-            body: JSON.stringify(amenityDetails),
-        });
+
+async function saveRoomWithApi(details) {
+    const body = { name: details.name, capacity: details.capacity, location: details.location };
+    const room = details.id
+        ? await apiRequest(`/rooms/${encodeURIComponent(details.id)}`, { method: "PUT", body: JSON.stringify(body) })
+        : await apiRequest("/rooms", { method: "POST", body: JSON.stringify(body) });
+
+    if (details.id) {
+        const existing = await apiRequest(`/rooms/${encodeURIComponent(details.id)}`);
+        if (Boolean(existing.is_active) !== Boolean(details.active)) {
+            await apiRequest(`/rooms/${encodeURIComponent(details.id)}/status`, {
+                method: "PATCH", body: JSON.stringify({ is_active: Boolean(details.active) }),
+            });
+        }
     }
-    const template = requireSetting("VITE_ADMIN_AMENITY_PATH_TEMPLATE", apiSettings.amenityPathTemplate);
-    if (!template.includes("{amenityId}")) {
-        throw new Error("The admin amenity path must include {amenityId}.");
+
+    const allAmenities = await getAmenitiesFromApi();
+    const amenityIds = new Map(allAmenities.map((amenity) => [amenity.name, amenity.id]));
+    const current = details.id ? await apiRequest(`/rooms/${encodeURIComponent(details.id)}/amenities`) : [];
+    const currentIds = new Set(current.map((item) => String(item.id)));
+    const selectedIds = new Set((details.amenities || []).map((name) => amenityIds.get(name)).filter(Boolean).map(String));
+    const roomId = room.id ?? details.id;
+    const operations = [];
+    for (const id of selectedIds) {
+        if (!currentIds.has(id)) operations.push(apiRequest(`/rooms/${roomId}/amenities/${id}`, { method: "POST" }));
     }
-    const path = template.replace("{amenityId}", encodeURIComponent(amenityDetails.id));
-    return apiRequest(path, {
-        method: "PATCH",
-        body: JSON.stringify(amenityDetails),
-    });
+    for (const id of currentIds) {
+        if (!selectedIds.has(id)) operations.push(apiRequest(`/rooms/${roomId}/amenities/${id}`, { method: "DELETE" }));
+    }
+    await Promise.all(operations);
+    return mapRoom({ ...room, is_active: details.active, amenities: (details.amenities || []).map((name) => ({ name })) });
 }
+
+async function saveAmenityWithApi(details) {
+    const body = { name: details.name, description: details.description || null };
+    return details.id
+        ? apiRequest(`/amenities/${encodeURIComponent(details.id)}`, { method: "PUT", body: JSON.stringify(body) })
+        : apiRequest("/amenities", { method: "POST", body: JSON.stringify(body) });
+}
+
 async function getUtilizationReportFromApi(dateRange) {
-    const path = requireSetting("VITE_ADMIN_UTILIZATION_PATH", apiSettings.utilizationPath);
-    const query = new URLSearchParams({
-        startDate: dateRange.startDate,
-        endDate: dateRange.endDate,
-    });
-    return requireList(await apiRequest(`${path}?${query.toString()}`), "utilization report");
+    const [rooms, bookings] = await Promise.all([
+        getRoomsFromApi(),
+        fetchAllPages((page, limit) => apiRequest(`/bookings?page=${page}&limit=${limit}`)),
+    ]);
+    const mappedBookings = bookings.map((booking) => mapBooking(booking));
+    return calculateUtilizationRows(rooms, mappedBookings, dateRange);
 }
+
 export const adminService = useMockServices
     ? {
         getRooms: getMockAdminRooms,

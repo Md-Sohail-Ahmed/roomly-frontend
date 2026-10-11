@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, CalendarDays, Clock3, Users } from "lucide-react";
+import { ArrowLeft, CalendarDays, Clock3 } from "lucide-react";
 import { roomsService } from "../services/roomsService.js";
 import { roomPlanningService } from "../services/roomPlanningService.js";
 import { formatDate, formatTime, getLocalDateString } from "../utils/dateTime.js";
@@ -114,7 +114,6 @@ function RoomSchedule() {
           </h2>
           <ol className="space-y-3">
             {bookings.map((booking) => {
-                const isCancelled = booking.status === "cancelled";
                 return (<li key={booking.id} className="flex gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                   <div className="flex w-28 shrink-0 items-start gap-2 pt-1 text-sm font-semibold text-violet-700">
                     <Clock3 size={17} aria-hidden="true"/>
@@ -124,15 +123,11 @@ function RoomSchedule() {
                     </span>
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-slate-900">{booking.title}</h3>
+                    <h3 className="font-semibold text-slate-900">Room reserved</h3>
                     <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-500">
                       <span className="inline-flex items-center gap-1.5">
-                        <Users size={16} aria-hidden="true"/>
-                        {booking.attendeeCount} attendees
-                      </span>
-                      <span className="inline-flex items-center gap-1.5">
                         <CalendarDays size={16} aria-hidden="true"/>
-                        {isCancelled ? "Cancelled" : "Booked"}
+                        Booked
                       </span>
                     </div>
                   </div>

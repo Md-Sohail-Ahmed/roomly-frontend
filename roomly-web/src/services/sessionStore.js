@@ -1,4 +1,5 @@
 const SESSION_USER_KEY = "roomly-session-user";
+const SESSION_TOKEN_KEY = "roomly-session-token";
 
 export function getSavedUser() {
     if (typeof sessionStorage === "undefined") {
@@ -19,8 +20,19 @@ export function saveUser(user) {
     return user;
 }
 
+export function saveSession(user, token) {
+    saveUser(user);
+    if (token) sessionStorage.setItem(SESSION_TOKEN_KEY, token);
+    return user;
+}
+
+export function getSavedToken() {
+    return typeof sessionStorage === "undefined" ? null : sessionStorage.getItem(SESSION_TOKEN_KEY);
+}
+
 export function clearSavedUser() {
     if (typeof sessionStorage !== "undefined") {
         sessionStorage.removeItem(SESSION_USER_KEY);
+        sessionStorage.removeItem(SESSION_TOKEN_KEY);
     }
 }
