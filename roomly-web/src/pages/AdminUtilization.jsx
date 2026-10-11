@@ -5,10 +5,13 @@ function getMonthStartDate() {
     const today = new Date();
     return getLocalDateString(new Date(today.getFullYear(), today.getMonth(), 1));
 }
+function getMonthEndDate() {
+    const today = new Date();
+    return getLocalDateString(new Date(today.getFullYear(), today.getMonth() + 1, 0));
+}
 function AdminUtilization() {
-    const today = getLocalDateString();
     const [startDate, setStartDate] = useState(getMonthStartDate());
-    const [endDate, setEndDate] = useState(today);
+    const [endDate, setEndDate] = useState(getMonthEndDate());
     const [reportRows, setReportRows] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState("");
@@ -33,7 +36,7 @@ function AdminUtilization() {
         }
     }, []);
     useEffect(() => {
-        loadReport(getMonthStartDate(), getLocalDateString());
+        loadReport(getMonthStartDate(), getMonthEndDate());
     }, [loadReport]);
     async function handleSubmit(event) {
         event.preventDefault();
