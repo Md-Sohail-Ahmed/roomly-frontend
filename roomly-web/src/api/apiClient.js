@@ -13,6 +13,7 @@ export class ApiError extends Error {
         this.responseBody = options.responseBody ?? null;
     }
 }
+
 function getRequestUrl(path) {
     if (!API_BASE_URL) {
         throw new ApiError("VITE_API_BASE_URL is not configured.");

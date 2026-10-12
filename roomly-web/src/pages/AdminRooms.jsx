@@ -143,7 +143,7 @@ function AdminRooms() {
             Room is active
           </label>)}
 
-        <button type="submit" disabled={isSaving} className="rounded-lg bg-violet-600 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 disabled:cursor-wait disabled:opacity-60">
+        <button type="submit" disabled={isSaving} className="rounded-lg bg-violet-600 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 disabled:cursor-wait disabled:opacity-60 ml-2.5">
           {isSaving ? "Saving room..." : editingId ? "Save room" : "Create room"}
         </button>
       </form>
